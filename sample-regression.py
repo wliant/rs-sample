@@ -27,6 +27,11 @@ for card in cards2:
     if len(result) != 1:
         print("{0}: found {1}".format(card[0], len(result)))
 
+select1 = [a for a in cards if "attack" not in a and a["type"] == "MINION"]
+print(len(select1))
+for s in select1:
+    print("{0} {1} {2}".format(s["name"], s["rarity"], s["type"]))
+
 myCardList = []
 for card in cards2:
     searchResult = [a for a in cards if a["name"] == card[0] and ("set" not in a or a["set"] != "HERO_SKINS")]
@@ -55,9 +60,9 @@ for card in cards2:
         "durability": durability
     })
 
-print(len(myCardList))
-for card in myCardList:
-    print(card)
+#print(len(myCardList))
+#for card in myCardList:
+#    print(card)
 
 
 #data processing card stats
@@ -78,6 +83,6 @@ from sklearn import svm
 
 clf = svm.SVR()
 clf.fit(data,winrates)
-print("predicting for card {0}".format(myCardList[0]["name"]))
-print(clf.predict([cardToRow(myCardList[0])]))
+#print("predicting for card {0}".format(myCardList[0]["name"]))
+#print(clf.predict([cardToRow(myCardList[0])]))
 

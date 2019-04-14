@@ -1,69 +1,21 @@
-import csv
-import json
-
-#cards will hold a list of class dictonary object 
-cards = []
-cards2 = []
-#data processing cards data
-with open("cards-in-use.json", "rb") as infile:
-    #load from json file
-    cards = json.load(infile)
-
-with open("cards-wild.csv") as infile:
-    reader = csv.reader(infile, quotechar='"', delimiter=',', quoting=csv.QUOTE_ALL, skipinitialspace=True)
-    cards2 = [r for r in reader]
-
-# validate card names from csv file match with json file
-for card in cards2:
-    result = [a for a in cards if a["name"] == card[0] and ("set" not in a or a["set"] != "HERO_SKINS")]
-    if len(result) != 1:
-        print("{0}: found {1}".format(card[0], len(result)))
-
-myCardList = []
-for card in cards2:
-    searchResult = [a for a in cards if a["name"] == card[0] and ("set" not in a or a["set"] != "HERO_SKINS")]
-    matchedCard = searchResult[0]
-
-    cardId = matchedCard["dbfId"]
-    name = card[0]
-    cardType = matchedCard["type"]
-    cardRarity = matchedCard["rarity"]
-    cardClass = matchedCard["cardClass"]
-    cardRace = matchedCard["race"] if "race" in matchedCard else ""
-    health = card[6]
-    attack = card[7]
-    cost = card[5]
-    durability = card[8]
-    myCardList.append({
-        "id": cardId,
-        "name": name,
-        "type": cardType,
-        "rarity": cardRarity,
-        "class": cardClass,
-        "race": cardRace,
-        "health": health,
-        "attack": attack,
-        "cost": cost,
-        "durability": durability
-    })
+#    This file is part of DEAP.
+#
+#    DEAP is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Lesser General Public License as
+#    published by the Free Software Foundation, either version 3 of
+#    the License, or (at your option) any later version.
+#
+#    DEAP is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#    GNU Lesser General Public License for more details.
+#
+#    You should have received a copy of the GNU Lesser General Public
+#    License along with DEAP. If not, see <http://www.gnu.org/licenses/>.
 
 
-
-#['PALADIN', 'NEUTRAL', 'HUNTER', 'WARLOCK', 'ROGUE', 'PRIEST', 'DRUID', 'SHAMAN', 'WARRIOR', 'MAGE']
-# class as key, list of card id as value
-classCards = { c["class"]: [a["id"] for a in myCardList if a["class"] == c["class"]] for c in myCardList}
-
-
-#target class
-targetClass = "MAGE"
-
-cardRarityDict = {a["id"]: a["rarity"] for a in myCardList if a["class"] == targetClass or a["class"] == "NEUTRAL"}
-cardNameDict = {a["id"]: a["name"] for a in myCardList if a["class"] == targetClass or a["class"] == "NEUTRAL"}
-
-#list of cards
-cardPool = [a for a in classCards[targetClass]] + [a for a in classCards["NEUTRAL"]]
-
-preselect = []
+#    example which maximizes the sum of a list of integers
+#    each of which can be 0 or 1
 
 import random
 
@@ -71,59 +23,43 @@ from deap import base
 from deap import creator
 from deap import tools
 
-creator.create("FitnessMax", base.Fitness, weights=(1.0,-0.7))
+creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
 
-toolbox.register("attr_bool", random.randint, 0, len(cardPool) - 1)
-toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, 30 - len(preselect))
+# Attribute generator 
+#                      define 'attr_bool' to be an attribute ('gene')
+#                      which corresponds to integers sampled uniformly
+#                      from the range [0,1] (i.e. 0 or 1 with equal
+#                      probability)
+toolbox.register("attr_bool", random.randint, 0, 1)
+
+# Structure initializers
+#                         define 'individual' to be an individual
+#                         consisting of 100 'attr_bool' elements ('genes')
+toolbox.register("individual", tools.initRepeat, creator.Individual, 
+    toolbox.attr_bool, 100)
+
+# define the population to be a list of individuals
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 # the goal ('fitness') function to be maximized
-def evalFct(individual):
-    deck = set()
-    for i in preselect:
-        deck.add(i)
-    for index in individual:
-        deck.add(cardPool[index])
-    return random.randint(0, 15), len(deck)
-
-def feasible(individual):
-    deck = {}
-    for i in preselect:
-        if i in deck:
-            deck[i] += 1
-        else:
-            deck[i] = 1
-
-    for index in individual:
-        card = cardPool[index]
-        if card in deck:
-            deck[card] += 1
-        else:
-            deck[card] = 1
-    
-    for card in deck.keys():
-        cardRarity = cardRarityDict[card]
-
-        if cardRarity == "LEGENDARY" and deck[card] > 1 or deck[card] > 2:
-            return False
-    return True
+def evalOneMax(individual):
+    return sum(individual),
 
 #----------
 # Operator registration
 #----------
 # register the goal / fitness function
-toolbox.register("evaluate", evalFct)
-toolbox.decorate("evaluate", tools.DeltaPenalty(feasible, -100))
+toolbox.register("evaluate", evalOneMax)
 
 # register the crossover operator
 toolbox.register("mate", tools.cxTwoPoint)
 
 # register a mutation operator with a probability to
 # flip each attribute/gene of 0.05
-toolbox.register("mutate", tools.mutUniformInt, low=0, up=len(cardPool) - 1, indpb=0.05)
+toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
 
 # operator for selecting individuals for breeding the next
 # generation: each individual of the current generation
@@ -171,7 +107,6 @@ def main():
         offspring = toolbox.select(pop, len(pop))
         # Clone the selected individuals
         offspring = list(map(toolbox.clone, offspring))
-        print("offspring length: {0}".format(len(offspring)))
     
         # Apply crossover and mutation on the offspring
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
@@ -204,7 +139,7 @@ def main():
         pop[:] = offspring
         
         # Gather all the fitnesses in one list and print the stats
-        fits = [ind.fitness.values[1] for ind in pop]
+        fits = [ind.fitness.values[0] for ind in pop]
         
         length = len(pop)
         mean = sum(fits) / length
@@ -221,8 +156,5 @@ def main():
     best_ind = tools.selBest(pop, 1)[0]
     print("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
 
-    al = sorted(best_ind)
-    for index in al:
-        print(cardNameDict[cardPool[index]])
 if __name__ == "__main__":
     main()
